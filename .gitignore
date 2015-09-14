@@ -1,0 +1,19 @@
+# Eclipse Files
+.project
+.classpath
+.settings/
+
+# Android Studio Files
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Folders
+target/
+build/
+
+# Other Files
+.gradle
+out
+*.bin
