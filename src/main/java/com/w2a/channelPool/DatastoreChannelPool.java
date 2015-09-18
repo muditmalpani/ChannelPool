@@ -2,14 +2,21 @@ package com.w2a.channelPool;
 
 public class DatastoreChannelPool implements ChannelPool {
 
-    public String getToken() {
+    @Override
+    public String getToken(String clientId) {
         return null;
     }
 
-    public void releaseToken() {
+    @Override
+    public void releaseToken(String token) {
     }
 
-    public void ping() {
+    @Override
+    public void ping(String token) {
+    }
+
+    @Override
+    public void reset() {
     }
 
 }
