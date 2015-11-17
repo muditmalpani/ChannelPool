@@ -13,6 +13,12 @@ public interface ChannelPool {
     public void releaseToken(String token);
 
     /**
+     * Marks the tokens which haven't been pinged for `timeoutInMillis` ms as
+     * unused
+     */
+    public void releaseUnusedTokens(long timeoutInMillis);
+
+    /**
      * Updates the last ping time for that token.
      */
     public void ping(String token);

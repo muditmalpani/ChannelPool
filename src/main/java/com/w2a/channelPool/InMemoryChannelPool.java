@@ -2,6 +2,7 @@ package com.w2a.channelPool;
 
 import com.google.appengine.api.channel.ChannelService;
 import com.google.appengine.api.channel.ChannelServiceFactory;
+import com.w2a.channelPool.ofy.TokenInfo;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -15,6 +16,13 @@ import java.util.Queue;
  */
 public class InMemoryChannelPool implements ChannelPool {
     private Map<String, TokenInfo> activeTokenMap;
+
+    /*
+     * This map is used to make sure that there is one-to-one mapping between
+     * client id and token
+     */
+    private Map<String, TokenInfo> clientIdToTakenMap;
+
     private Queue<String> unusedTokenPool;
 
     public InMemoryChannelPool() {
@@ -24,7 +32,12 @@ public class InMemoryChannelPool implements ChannelPool {
 
     @Override
     public String getToken(String clientId) {
-        // TODO: Validate that clientId doesn't already have an active token
+        // If the client is already assigned a token, return the same token
+        // Else, return a token from the pool or generate a new token if
+        // pool is empty
+        if (clientIdToTakenMap.containsKey(clientId)) {
+            return clientIdToTakenMap.get(clientId).token;
+        }
         final String token;
         if (unusedTokenPool.size() > 0) {
             token = unusedTokenPool.poll();
@@ -32,17 +45,34 @@ public class InMemoryChannelPool implements ChannelPool {
             ChannelService channelService = ChannelServiceFactory.getChannelService();
             token = channelService.createChannel(clientId);
         }
-        activeTokenMap.put(token, new TokenInfo(clientId));
+        TokenInfo info = new TokenInfo(clientId, token);
+        activeTokenMap.put(token, info);
+        clientIdToTakenMap.put(clientId, info);
         return token;
     }
 
     @Override
     public void releaseToken(String token) {
-        if (!activeTokenMap.containsKey(token)) {
+        TokenInfo info = activeTokenMap.get(token);
+        if (info == null) {
             throw new IllegalArgumentException("The token specified is not active. Token: " + token);
         }
         activeTokenMap.remove(token);
+        clientIdToTakenMap.remove(info.clientId);
         unusedTokenPool.add(token);
+    }
+
+    @Override
+    public void releaseUnusedTokens(long timeoutInMillis) {
+        long currentTime = System.currentTimeMillis();
+        for (Map.Entry<String, TokenInfo> entry : activeTokenMap.entrySet()) {
+            TokenInfo info = entry.getValue();
+            if (currentTime - info.lastUpdateTime > timeoutInMillis) {
+                activeTokenMap.remove(info.token);
+                clientIdToTakenMap.remove(info.clientId);
+                unusedTokenPool.add(info.token);
+            }
+        }
     }
 
     @Override
@@ -57,19 +87,5 @@ public class InMemoryChannelPool implements ChannelPool {
     @Override
     public void reset() {
         unusedTokenPool = new LinkedList<>();
-    }
-
-    private static class TokenInfo {
-        private final String clientId;
-        private long lastSeenTs;
-
-        public TokenInfo(String id) {
-            this.clientId = id;
-            this.lastSeenTs = System.currentTimeMillis();
-        }
-
-        public void ping() {
-            this.lastSeenTs = System.currentTimeMillis();
-        }
     }
 }
